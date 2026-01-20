@@ -1,0 +1,11 @@
+streamlit
+torch
+torchaudio
+numpy
+pandas
+librosa
+panns-inference
+matplotlib
+seaborn
+scikit-learn
+huggingface_hub

@@ -1,0 +1,22 @@
+# Ignorar archivos de Python compilados
+__pycache__/
+*.pyc
+
+# Ignorar archivos de entorno virtual 
+venv/
+.env
+
+# Ignorar archivos pesados o de sistema
+.DS_Store
+weights/*.pth  # IMPORTANTE: Si tu modelo pesa >100MB, esto evita errores al subir
+
+
+# Streamlit y temporales
+.streamlit/config.toml
+assets/ejemplos/
+
+weights/
+panns_data/
+__pycache__/
+venv/
+.env
