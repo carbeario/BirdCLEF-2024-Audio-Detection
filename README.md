@@ -30,7 +30,7 @@ El sistema está diseñado para ser "Plug & Play". No requiere instalación manu
 
 1.  **Clonar repositorio:**
     ```bash
-    git clone [https://github.com/TU_USUARIO/TFG_BirdCLEF_2024.git](https://github.com/TU_USUARIO/TFG_BirdCLEF_2024.git)
+    git clone [https://github.com/carbeario/BirdCLEF-2024-Audio-Detection](https://github.com/carbeario/BirdCLEF-2024-Audio-Detection)
     cd TFG_BirdCLEF_2024
     ```
 
