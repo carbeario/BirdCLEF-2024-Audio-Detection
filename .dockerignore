@@ -1,0 +1,40 @@
+# ===========================
+# SISTEMA Y GIT
+# ===========================
+.git
+.gitignore
+.dockerignore
+.vscode
+.idea
+README.md
+
+# ===========================
+# PYTHON 
+# ===========================
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+
+# ===========================
+# DATOS Y EXPERIMENTOS 
+# ===========================
+# No necesitamos scripts de prueba ni CSVs de entrenamiento en la Demo final
+experiments/
+train_metadata.csv
+
+# ===========================
+# TEMPORALES DE LA APP
+# ===========================
+# CRÍTICO: Evita "hornear" audios de prueba dentro de la imagen
+temp/
+
+# ===========================
+# PESOS (ESTRATEGIA HUGGING FACE)
+# ===========================
+# Ignoramos la carpeta local weights/ porque el Dockerfile 
+# los descarga frescos de internet ("Bake-in").
+# Si no ignoras esto, Docker intentará copiar tus gigas locales al "contexto" de build (lento).
+weights/

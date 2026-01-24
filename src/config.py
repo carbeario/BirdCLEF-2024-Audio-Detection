@@ -4,9 +4,6 @@ import pandas as pd
 from pathlib import Path
 import streamlit as st
 
-
-
-
 # ==========================================
 # 0. ESTILOS PÁGINAS
 # ==========================================
@@ -17,7 +14,7 @@ def aplicar_estilos():
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         
-        /* Botones más bonitos (con sombra y bordes redondeados) */
+        /* Botones más bonitos */
         .stButton>button {
             border-radius: 8px;
             font-weight: bold;
@@ -30,7 +27,7 @@ def aplicar_estilos():
             box-shadow: 0px 4px 8px rgba(0,0,0,0.2);
         }
         
-        /* Cajas de métricas con fondo suave */
+        /* Cajas de métricas */
         div[data-testid="stMetric"] {
             background-color: #f0f2f6;
             padding: 10px;
@@ -40,13 +37,9 @@ def aplicar_estilos():
         </style>
     """, unsafe_allow_html=True)
 
-
-
-
 # ==========================================
 # 1. GESTIÓN DE RUTAS
 # ==========================================
-# Resolvemos la ruta absoluta para que funcione en cualquier PC
 BASE_DIR = Path(__file__).resolve().parent.parent 
 
 ASSETS_DIR = BASE_DIR / "assets"
@@ -55,23 +48,28 @@ PAGES_DIR = BASE_DIR / "pages"
 SRC_DIR = BASE_DIR / "src"
 TEMP_DIR = BASE_DIR / "temp"
 
-# Crear carpetas necesarias
+# Crear carpetas necesarias si no existen
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Archivos específicos
 LOGO_PATH = ASSETS_DIR / "logo.png"
-# IMPORTANTE: Asegúrate de que el archivo .pth se llame así en tu carpeta /weights
-MODEL_PATH = WEIGHTS_DIR / "panns_inference.pth" 
 METADATA_PATH = ASSETS_DIR / "species_metadata.csv"
+PANNS_LABELS_PATH = ASSETS_DIR / "class_labels_indices.csv" # <--- NUEVO
+
+# --- DICCIONARIO DE MODELOS ---
+MODEL_PATHS = {
+    'panns': WEIGHTS_DIR / "panns_mejor.pth",       # Tu fine-tuning
+    'passt': WEIGHTS_DIR / "passt_mejor.pth",       # Tu fine-tuning
+    'panns_base': WEIGHTS_DIR / "Cnn14_mAP=0.431.pth" # <--- NUEVO: La base
+}
 
 
 # ==========================================
-# 2. LA VERDAD ABSOLUTA (LISTA MAESTRA)
+# 2. LISTA MAESTRA
 # ==========================================
-# Esta lista define el orden EXACTO de las neuronas de salida del modelo.
-# NO MODIFICAR EL ORDEN BAJO NINGÚN CONCEPTO.
+# Lista de 101 especies (Orden de entrenamiento)
 SPECIES_LIST = [
     'asbfly', 'ashdro1', 'ashpri1', 'asikoe2', 'barswa', 'bcnher', 'bkskit1', 'bkwsti', 
     'bladro1', 'blakit1', 'blhori1', 'blnmon1', 'blrwar1', 'brcful1', 'brnhao1', 'brnshr', 
@@ -88,68 +86,46 @@ SPECIES_LIST = [
     'whiter2', 'whrmun', 'whtkin2', 'woosan', 'zitcis1'
 ]
 
-# Mapa inverso para búsquedas rápidas (Etiqueta -> Índice)
+# Mapa inverso (Etiqueta -> Índice)
 SPECIES_TO_ID = {label: i for i, label in enumerate(SPECIES_LIST)}
 
-
 # ==========================================
-# 3. CARGA DE METADATOS (SINCRONIZADA)
+# 3. CARGA DE METADATOS
 # ==========================================
 def load_species_data():
-    """
-    Carga el CSV y lo reordena para que coincida EXACTAMENTE con SPECIES_LIST.
-    Esto evita errores si el CSV se ordena alfabéticamente por nombre común, etc.
-    """
     if METADATA_PATH.exists():
         try:
             df = pd.read_csv(METADATA_PATH)
             df['primary_label'] = df['primary_label'].astype(str)
-            
-            # --- BLINDAJE DE SEGURIDAD ---
-            # 1. Filtramos solo las especies que el modelo conoce
             df = df[df['primary_label'].isin(SPECIES_LIST)]
-            
-            # 2. Establecemos el 'primary_label' como índice y reordenamos según la lista maestra
             df = df.set_index('primary_label')
             df = df.reindex(SPECIES_LIST)
-            df = df.reset_index() # Recuperamos la columna
-            
+            df = df.reset_index()
             return df
         except Exception as e:
-            print(f"❌ Error leyendo CSV: {e}")
-            return pd.DataFrame() # Devuelve vacío si falla
+            print(f"Error leyendo CSV: {e}")
+            return pd.DataFrame()
     else:
-        print("⚠️ ALERTA: No se encuentra species_metadata.csv.")
+        # print("ALERTA: No se encuentra species_metadata.csv.")
         return pd.DataFrame()
 
-# DataFrame disponible para toda la app
 SPECIES_DF = load_species_data()
 
-
 # ==========================================
-# 4. CONFIGURACIÓN DEL MODELO (PANNs)
+# 4. CONFIGURACIÓN DE AUDIO
 # ==========================================
-# Parámetros de Audio
 SAMPLE_RATE = 32000
-DURATION = 5            # Segundos
+DURATION = 5
 FMIN = 20
-FMAX = 16000 # Frecuencia máxima para PANNs (importante)
+FMAX = 14000  # Ajustado a 14000 para coincidir con el entrenamiento
 HOP_LENGTH = 512
 
-# Configuración Específica de PANNs
-MODEL_CONFIG = {
-    "n_mels": 64,       # PANNs usa 64
-    "name": "PANNs (CNN14)",
-    "description": "Red Convolucional optimizada con SpecAugment."
-}
-
-# Hardware: Detecta automáticamente si tienes GPU
+# Hardware
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
 
 # ==========================================
 # 5. UI / ESTÉTICA
 # ==========================================
-PROJECT_TITLE = "BirdCLEF: Reconocimiento de Aves"
+PROJECT_TITLE = "BirdCLEF 2024: Detector Avanzado"
 PROJECT_ICON = "🦅"
 COLOR_PRIMARY = "#1f77b4"

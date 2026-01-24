@@ -1,212 +1,160 @@
 import streamlit as st
+import pandas as pd
 import requests
 import re
-from src import config 
+import html
+from src import config
 
-# 1. CARGA DE ESTILOS GLOBALES
-config.aplicar_estilos()
-st.set_page_config(page_title="Ficha Técnica", page_icon="📖", layout="wide")
+# 1. CONFIGURACIÓN
+st.set_page_config(page_title="Catálogo de Especies", page_icon="📖", layout="wide")
 
-# ==========================================
-# 2. CSS ESPECÍFICO (FIX DE CONTRASTE)
-# ==========================================
+# 2. CSS ESTILO "LIMPIO"
 st.markdown("""
     <style>
-        /* A. ARREGLAR MÉTRICAS (Fondo oscuro y texto blanco) */
+        /* A. MÉTRICAS CON ESTILO */
         div[data-testid="stMetric"] {
-            background-color: #1a1c24; /* Fondo casi negro */
+            background-color: #1a1c24;
             border: 1px solid #333;
-            padding: 10px !important;
-            border-radius: 8px;
+            padding: 15px !important;
+            border-radius: 10px;
+            text-align: center; /* Centrado para que quede elegante */
         }
         div[data-testid="stMetricValue"] {
-            font-size: 1.1rem !important;
-            color: #ffffff !important; /* Blanco puro */
-            word-wrap: break-word; 
-            white-space: normal;
-            font-weight: 600;
+            color: #4da9ff !important; /* Azul técnico */
+            font-size: 1.4rem !important;
+            font-weight: 700;
         }
         div[data-testid="stMetricLabel"] {
-            font-size: 0.85rem !important;
-            color: #a0a0a0 !important; /* Gris claro */
-            margin-bottom: 5px;
+            color: #a0a0a0 !important;
+            font-size: 0.9rem !important;
         }
 
-        /* B. CAJA DE DESCRIPCIÓN PERSONALIZADA (Reemplaza al st.info azul chillón) */
+        /* B. CAJA DE DESCRIPCIÓN */
         .desc-box {
             background-color: #13151b;
-            border-left: 3px solid #FF9F33; /* Línea naranja elegante */
-            padding: 15px;
-            border-radius: 0 5px 5px 0;
+            border-left: 4px solid #4da9ff; /* Azul a juego con la métrica */
+            padding: 20px;
+            border-radius: 0 8px 8px 0;
             color: #e0e0e0;
+            line-height: 1.6;
+            margin-top: 15px;
             font-size: 0.95rem;
-            line-height: 1.5;
-            margin-top: 10px;
         }
 
-        /* C. IMAGEN CON ESTILO */
-        img {
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }
-
-        /* D. TAG DE CÓDIGO (ID Modelo) */
+        /* C. ID TAG */
         .id-tag {
-            background-color: #2b1d1d;
-            border: 1px solid #5c2b2b;
-            color: #ff6b6b;
-            padding: 2px 6px;
+            background-color: #333;
+            color: #ff9f33; /* Naranja para resaltar el código */
+            padding: 3px 8px;
             border-radius: 4px;
             font-family: monospace;
             font-size: 0.9em;
+            border: 1px solid #555;
         }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. LÓGICA DE EXTRACCIÓN (WIKIPEDIA API)
+# 3. LÓGICA (SOLO LO ÚTIL)
 # ==========================================
 @st.cache_data(ttl=3600*24, show_spinner=False)
 def get_bird_details(scientific_name):
+    # Valores por defecto
     result = {
         "img": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/600px-No_image_available.svg.png",
-        "extract": "Descripción no disponible.",
-        "familia": "No detectada",
-        "status": "No evaluado ❓"
+        "extract": "Descripción no disponible en la API de Wikipedia.",
+        "familia": "Taxonomía no disponible"
     }
     
-    query = scientific_name.replace(" ", "_")
-    headers = {'User-Agent': 'BirdCLEF-TFG/1.0'}
+    if not scientific_name: return result
 
-    # --- API REST (Imagen y Texto) ---
+    query = scientific_name.replace(" ", "_")
+    headers = {'User-Agent': 'BirdCLEF-Student-App/1.0'}
+
+    # 1. API REST (Para Imagen y Resumen)
     try:
         api_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
-        response = requests.get(api_url, headers=headers, timeout=3)
-        if response.status_code == 200:
-            data = response.json()
-            if 'originalimage' in data:
-                result["img"] = data['originalimage']['source']
-            elif 'thumbnail' in data:
-                result["img"] = data['thumbnail']['source']
-            if 'extract' in data:
-                result["extract"] = data['extract']
+        resp = requests.get(api_url, headers=headers, timeout=3)
+        if resp.status_code == 200:
+            data = resp.json()
+            # Imagen
+            if 'originalimage' in data: result["img"] = data['originalimage']['source']
+            elif 'thumbnail' in data: result["img"] = data['thumbnail']['source']
+            # Texto
+            if 'extract' in data: result["extract"] = data['extract']
     except:
         pass
 
-    # --- SCRAPING HTML (Familia y Status) ---
-    html_text = ""
+    # 2. SCRAPING HTML (SOLO PARA FAMILIA - RELEVANTE CIENTÍFICAMENTE)
     try:
         html_url = f"https://en.wikipedia.org/wiki/{query}"
-        html_resp = requests.get(html_url, headers=headers, timeout=5)
+        html_resp = requests.get(html_url, headers=headers, timeout=4)
         if html_resp.status_code == 200:
-            html_text = html_resp.text
-    except:
-        pass
+            full_html = html_resp.text
+            clean_text = html.unescape(full_html) 
+            
+            # Buscar Familia (Ej: Muscicapidae)
+            match = re.search(r'Family:.*?([A-Z][a-z]+idae)', clean_text, re.IGNORECASE | re.DOTALL)
+            if match:
+                result["familia"] = match.group(1)
+            else:
+                match_simple = re.search(r'\b([A-Z][a-z]+idae)\b', result["extract"])
+                if match_simple: result["familia"] = match_simple.group(1)
 
-    # --- ANÁLISIS DE TEXTO ---
-    texto_busqueda = (html_text + " " + result["extract"])
-
-    # A. FAMILIA
-    match_familia = re.search(r'Family:.*?([A-Z][a-z]+idae)', texto_busqueda, re.IGNORECASE)
-    if match_familia:
-        result["familia"] = match_familia.group(1)
-    else:
-        match_simple = re.search(r'\b([A-Z][a-z]+idae)\b', texto_busqueda)
-        if match_simple:
-            result["familia"] = match_simple.group(1)
-
-    # B. ESTADO UICN
-    mapa_uicn = {
-        "Least Concern": "Preocupación Menor (LC) 🟢",
-        "Near Threatened": "Casi Amenazada (NT) 🟡",
-        "Vulnerable": "Vulnerable (VU) 🟠",
-        "Endangered": "En Peligro (EN) 🔴",
-        "Critically Endangered": "Crítico (CR) 🚨", 
-        "Extinct in the Wild": "Extinto en Silvestre (EW) 🏚️",
-        "Extinct": "Extinto (EX) ⚫",
-    }
-    
-    for eng, esp in mapa_uicn.items():
-        if re.search(rf'\b{eng}\b', texto_busqueda, re.IGNORECASE):
-            result["status"] = esp
-            break
+    except Exception as e:
+        print(f"Error scraping wiki: {e}")
 
     return result
 
 # ==========================================
-# 4. INTERFAZ (FRONTEND)
+# 4. INTERFAZ
 # ==========================================
-df_especies = config.SPECIES_DF
-
-if df_especies.empty:
-    st.error("No se han podido cargar los metadatos de las especies.")
+if config.SPECIES_DF.empty:
+    st.error("⚠️ No se pudo cargar el archivo species_metadata.csv")
     st.stop()
 
+# --- SIDEBAR (BUSCADOR) ---
 with st.sidebar:
-    st.title(f"Catálogo")
-    st.info(f"Base de datos: **{len(df_especies)} especies**")
+    st.header("🔍 Buscador")
+    st.info(f"Total especies: **{len(config.SPECIES_DF)}**")
     
-    opciones = [f"{row['common_name']} ({row['primary_label']})" for _, row in df_especies.iterrows()]
-    seleccion_usuario = st.selectbox("🔍 Buscar Especie:", options=opciones, index=0)
-    codigo = seleccion_usuario.split("(")[-1].replace(")", "")
+    opciones = [f"{r['common_name']} ({r['primary_label']})" for _, r in config.SPECIES_DF.iterrows()]
+    seleccion = st.selectbox("Selecciona una ave:", opciones)
+    codigo = seleccion.split("(")[-1].replace(")", "")
 
-try:
-    row = df_especies[df_especies['primary_label'] == codigo].iloc[0]
-    nombre_cientifico = row['scientific_name']
-    nombre_comun = row['common_name']
+# --- LÓGICA PRINCIPAL ---
+row = config.SPECIES_DF[config.SPECIES_DF['primary_label'] == codigo].iloc[0]
+sci_name = row['scientific_name']
+com_name = row['common_name']
+link_xc = row['url_xenocanto']
+
+# Carga de datos
+with st.spinner("Cargando ficha..."):
+    wiki_data = get_bird_details(sci_name)
+
+# --- LAYOUT LIMPIO ---
+c_head, c_btn = st.columns([3, 1], vertical_alignment="center")
+with c_head:
+    st.markdown(f"# {com_name}")
+    st.markdown(f"**Científico:** *{sci_name}* &nbsp; | &nbsp; **ID:** <span class='id-tag'>{codigo}</span>", unsafe_allow_html=True)
+
+with c_btn:
+    st.link_button("🔊 Escuchar Audio", link_xc, use_container_width=True)
+
+st.markdown("---")
+
+col_img, col_info = st.columns([1, 1.5], gap="large")
+
+with col_img:
+    st.image(wiki_data["img"], use_container_width=True)
+
+with col_info:
+    # SECCIÓN TÉCNICA (SOLO FAMILIA)
+    # Al quitar el status, la familia destaca más como dato biológico clave
+    st.metric("Familia Taxonómica", wiki_data['familia'])
     
-    with st.status("🔍 Consultando bases de datos...", expanded=True) as status:
-        st.write("Conectando con Wikipedia API...")
-        wiki_data = get_bird_details(nombre_cientifico)
-        status.update(label="¡Ficha cargada!", state="complete", expanded=False)
+    st.markdown("#### Descripción")
+    if wiki_data['extract']:
+        st.markdown(f'<div class="desc-box">{wiki_data["extract"]}</div>', unsafe_allow_html=True)
     
-    # --- CABECERA ---
-    c_title, c_links = st.columns([3, 1], vertical_alignment="center")
-    with c_title:
-        st.markdown(f"<h1 style='margin-bottom:0px;'>{nombre_comun}</h1>", unsafe_allow_html=True)
-        # Usamos la clase CSS .id-tag que definimos arriba
-        st.markdown(f"""
-        <div style='color: #a3a8b8; margin-top: 5px;'>
-            <i>{nombre_cientifico}</i> &nbsp;•&nbsp; ID: <span class='id-tag'>{codigo}</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with c_links:
-        r1, r2 = st.columns(2)
-        r1.link_button("🔊 Audio", row['url_xenocanto'], use_container_width=True)
-        r2.link_button("📖 Wiki", f"https://en.wikipedia.org/wiki/{nombre_cientifico.replace(' ', '_')}", use_container_width=True)
-
-    st.markdown("---")
-
-    # --- CUERPO ---
-    col_izq, col_der = st.columns([1, 1.5], gap="large")
-
-    with col_izq:
-        st.image(wiki_data["img"], use_container_width=True)
-
-    with col_der:
-        st.subheader("Ficha Técnica")
-        
-        # Contenedor principal con borde
-        with st.container(border=True):
-            # Usamos CSS para que estas métricas se vean con fondo oscuro
-            k1, k2 = st.columns([1, 1.2]) 
-            k1.metric("Familia Taxonómica", wiki_data['familia'])
-            k2.metric("Estado UICN", wiki_data['status'])
-
-            st.markdown("<div style='margin-top: 20px; margin-bottom: 5px; font-weight: bold; color: #ccc;'>Descripción:</div>", unsafe_allow_html=True)
-            
-            # Usamos el div personalizado .desc-box
-            if wiki_data['extract'] and wiki_data['extract'] != "Descripción no disponible.":
-                 st.markdown(f'<div class="desc-box">{wiki_data["extract"]}</div>', unsafe_allow_html=True)
-            else:
-                 st.warning("No se encontró descripción en Wikipedia.")
-            
-            st.markdown(f"""
-            <div style="font-size: 0.8em; opacity: 0.5; margin-top: 20px; text-align: right; border-top: 1px solid #333; padding-top: 10px;">
-            ℹ️ Datos sincronizados con <b>Wikipedia Live</b>
-            </div>
-            """, unsafe_allow_html=True)
-
-except Exception as e:
-    st.error(f"Error cargando la ficha: {e}")
+    st.caption(f"ℹ️ Fuente: Wikipedia API.")

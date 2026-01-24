@@ -1,22 +1,42 @@
-# Ignorar archivos de Python compilados
+# ===========================
+# 🐍 PYTHON & SISTEMA
+# ===========================
 __pycache__/
-*.pyc
-
-# Ignorar archivos de entorno virtual 
-venv/
-.env
-
-# Ignorar archivos pesados o de sistema
+*.py[cod]
+*$py.class
 .DS_Store
-weights/*.pth  # IMPORTANTE: Si tu modelo pesa >100MB, esto evita errores al subir
+Thumbs.db
 
-
-# Streamlit y temporales
-.streamlit/config.toml
-assets/ejemplos/
-
-weights/
-panns_data/
-__pycache__/
+# ===========================
+# 🛠️ ENTORNOS & SECRETOS
+# ===========================
 venv/
+env/
 .env
+.vscode/
+
+# ===========================
+# 🦅 MODELOS & PESOS (Heavy Files)
+# ===========================
+# Ignoramos todos los .pth dentro de weights
+weights/*.pth
+# Ignoramos carpeta de datos de PANNs si se generara sola
+panns_data/
+
+# ===========================
+# DATOS TEMPORALES APP
+# ===========================
+# Ignorar audios de los usuarios/pruebas
+temp/
+
+# ===========================
+# EXPERIMENTOS
+# ===========================
+# Ignoramos datos pesados de entrenamiento, pero MANTENEMOS los scripts (.py)
+experiments/*.csv
+
+# ===========================
+# STREAMLIT
+# ===========================
+.streamlit/secrets.toml
+# .streamlit/config.toml  <-- (Descomenta si quieres guardar tu tema visual en git)
