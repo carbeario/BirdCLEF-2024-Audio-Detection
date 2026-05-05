@@ -1,7 +1,6 @@
 import streamlit as st
 from PIL import Image
 import os
-from src import config
 
 # 1. CONFIGURACIÓN
 st.set_page_config(layout="wide", page_title="BirdCLEF 2024 - TFG", page_icon="🦅")

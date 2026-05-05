@@ -1,306 +1,249 @@
 import streamlit as st
-import torch
-import numpy as np
-import pandas as pd
-import time
 import requests
 import os
-
-# Importamos tus módulos locales
-from src import config, inference, audio_utils
-
-# ==========================================
-# 1. CONFIGURACIÓN DE PÁGINA
-# ==========================================
-st.set_page_config(page_title="Detector en Vivo", page_icon="🎙️", layout="wide")
+import time
+from src import config      
+from src import ui_utils    
 
 # ==========================================
-# 2. CSS "HIGH-END" (ESTILOS PODIO)
+# CONFIGURACIÓN DE PÁGINA
 # ==========================================
-st.markdown("""
-    <style>
-        /* A. CONTENEDOR PRINCIPAL */
-        .block-container {
-            padding-top: 1.5rem;
-            padding-bottom: 3rem;
-        }
-        #MainMenu, footer {visibility: hidden;}
-
-        /* B. TARJETAS DE RESULTADOS */
-        .result-card {
-            background-color: #1a1c24;
-            border: 1px solid #3c4043;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            margin-bottom: 20px;
-            border-left: 5px solid #FF4B4B; /* Acento rojo para el ganador */
-        }
-        
-        /* C. TEXTOS */
-        h1 {
-            background: linear-gradient(90deg, #ffffff, #888888);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .species-title {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 5px;
-        }
-        .species-sci {
-            font-size: 1.1rem;
-            font-style: italic;
-            color: #a0a0a0;
-            margin-bottom: 15px;
-        }
-
-        /* D. BARRAS DE PROGRESO (PODIO) */
-        .bar-container {
-            width: 100%;
-            background-color: #2c2f38;
-            height: 12px; /* Altura más fina y elegante */
-            border-radius: 6px;
-            overflow: hidden;
-            margin-top: 5px;
-        }
-        .bar-fill {
-            height: 100%;
-            border-radius: 6px;
-            transition: width 0.6s ease-in-out;
-        }
-        
-        /* E. COLORES DEL PODIO */
-        .rank-1 { background: linear-gradient(90deg, #FF4B4B, #FF914D); } /* Rojo-Naranja (Ganador) */
-        .rank-2 { background: linear-gradient(90deg, #FFD700, #FDB931); } /* Dorado (2º) */
-        .rank-3 { background: linear-gradient(90deg, #00BFFF, #1E90FF); } /* Azul (3º) */
-        
-        /* F. FILAS SECUNDARIAS */
-        .secondary-row {
-            margin-bottom: 12px;
-            padding: 8px 12px;
-            background-color: #262730;
-            border-radius: 8px;
-            border: 1px solid #333;
-        }
-
-    </style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Detector BirdCLEF", page_icon="🦅", layout="wide")
 
 # ==========================================
-# 3. FUNCIONES AUXILIARES (UI)
+# 🚦 HEALTH CHECK: 
 # ==========================================
-def get_wiki_image_url(scientific_name):
-    """Busca foto en Wikipedia (versión ligera)"""
-    try:
-        query = scientific_name.replace(" ", "_")
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
-        resp = requests.get(url, headers={'User-Agent': 'BirdCLEF-Demo/1.0'}, timeout=2)
-        if resp.status_code == 200:
-            data = resp.json()
-            if 'originalimage' in data: return data['originalimage']['source']
-            if 'thumbnail' in data: return data['thumbnail']['source']
-    except:
-        pass
-    return "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/No_image_available.svg/600px-No_image_available.svg.png"
+def esperar_api():
+    """
+    Bloquea la ejecución mostrando un spinner hasta que la API responda (200 OK).
+    No recarga la página, solo esperaes un.
+    """
+    api_url_full = os.getenv("API_URL", "http://localhost:8000/predict")
+    api_root = api_url_full.replace("/predict", "")
+    
+    def hay_conexion():
+        try:
+            r = requests.get(api_root, timeout=1)
+            return r.status_code == 200
+        except:
+            return False
+
+    if hay_conexion():
+        return True
+    placeholder = st.empty()
+    
+    with placeholder.container():
+        with st.spinner("Iniciando Cerebro Digital (Cargando modelos PANNs/PaSST en RAM)..."):
+            
+            intentos = 0
+            max_intentos = 300 
+            
+            while not hay_conexion():
+                time.sleep(1) 
+                intentos += 1
+                
+                if intentos >= max_intentos:
+                    st.error("La API está tardando demasiado o Docker no arranca.")
+                    st.stop() 
+            
+    placeholder.success("¡Sistemas Online!")
+    time.sleep(1) 
+    placeholder.empty() 
+    return True
+
+if not esperar_api():
+    st.stop() 
+
+
+
 
 # ==========================================
-# 4. INTERFAZ PRINCIPAL
+# INTERFAZ PRINCIPAL
 # ==========================================
+
+# --- SIDEBAR ---
+with st.sidebar:
+    st.header("Configuración IA")
+    modelo_seleccionado = st.radio(
+        "Selecciona el modelo:",
+        ("panns", "passt"),
+        format_func=lambda x: "PANNs (Rápido)" if x == "panns" else "PaSST (Preciso)"
+    )
+    st.divider()
+    st.caption("**Nota:** PaSST analiza relaciones temporales largas, ideal para fondos ruidosos.")
 
 # --- CABECERA ---
-c1, c2 = st.columns([3, 1], vertical_alignment="center")
-with c1:
-    st.title("🎙️ Detector Bioacústico")
-    st.markdown("Sube un audio y selecciona la Inteligencia Artificial que prefieras.")
+st.title("Detector de Aves: BirdCLEF 2024")
+st.markdown("Identificación automática de especies mediante análisis de espectrogramas.")
 
-# --- SELECTOR DE MODELO (NUEVO) ---
-with c2:
-    model_option = st.radio(
-        "🧠 Cerebro AI:",
-        ("PANNs (Rápido)", "PaSST (Preciso)")
+# ==========================================
+# SELECTOR DUAL (SUBIR vs BIBLIOTECA)
+# ==========================================
+col_radio, _ = st.columns([2, 1])
+with col_radio:
+    fuente = st.radio(
+        "¿Origen del audio?",
+        ["Subir mi propio archivo", "Seleccionar de la Biblioteca (Assets)"],
+        horizontal=True
     )
-    # Traducir a clave interna
-    model_key = 'panns' if 'PANNs' in model_option else 'passt'
+
+archivo_bytes = None
+nombre_archivo = ""
+tipo_mime = ""
+
+# --- CASO A: SUBIR ARCHIVO ---
+if fuente == "Subir mi propio archivo":
+    uploaded = st.file_uploader("Arrastra tu archivo aquí (.wav, .mp3)", type=["wav", "mp3", "ogg", "flac"])
+    if uploaded:
+        archivo_bytes = uploaded.getvalue()
+        nombre_archivo = uploaded.name
+        tipo_mime = uploaded.type
+        st.audio(archivo_bytes, format=tipo_mime)
+
+# --- CASO B: USAR ASSETS ---
+else:
+    # Busca en 'assets' o 'assets/ejemplos'
+    rutas_posibles = ["assets", "assets/samples"]
+    ruta_valida = None
+    archivos = []
+
+    for r in rutas_posibles:
+        if os.path.exists(r):
+            # Filtramos solo audios
+            encontrados = [f for f in os.listdir(r) if f.lower().endswith(('.wav', '.mp3', '.ogg'))]
+            if encontrados:
+                ruta_valida = r
+                archivos = encontrados
+                break
     
-    # Semáforo simple
-    path_existe = os.path.exists(config.MODEL_PATHS[model_key])
-    if path_existe:
-        st.success("Listo", icon="✅")
+    if archivos:
+        seleccion = st.selectbox("Selecciona un audio de prueba:", archivos)
+        ruta_completa = os.path.join(ruta_valida, seleccion)
+        
+        # Leer en binario
+        with open(ruta_completa, "rb") as f:
+            archivo_bytes = f.read()
+        
+        nombre_archivo = seleccion
+        tipo_mime = "audio/wav" # Genérico
+        
+        st.info(f"Cargado desde: `{ruta_completa}`")
+        st.audio(archivo_bytes, format=tipo_mime)
     else:
-        st.warning("Descargando...", icon="⏳")
-
-st.markdown("---")
+        st.warning("No se encontraron archivos de audio en la carpeta 'assets'.")
 
 # ==========================================
-# ZONA DE ENTRADA (PESTAÑAS)
+#  MOTOR DE INFERENCIA
 # ==========================================
-final_audio_path = None 
+st.divider()
 
-tab_upload, tab_sample = st.tabs(["📂 Subir Archivo Propio", "🎵 Probar Ejemplos"])
+if archivo_bytes:
+    col_btn, col_msg = st.columns([1, 3])
+    with col_btn:
+        analizar = st.button("Analizar Audio", type="primary", use_container_width=True)
 
-# --- OPCIÓN A: UPLOAD ---
-with tab_upload:
-    uploaded_file = st.file_uploader("", type=["wav", "mp3", "ogg"], label_visibility="collapsed")
-    if uploaded_file:
-        temp_path = os.path.join(config.TEMP_DIR, uploaded_file.name)
-        os.makedirs(config.TEMP_DIR, exist_ok=True) # Asegurar que existe temp
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        final_audio_path = temp_path
-
-# --- OPCIÓN B: EJEMPLOS ---
-with tab_sample:
-    SAMPLES = {
-        "Selecciona un ejemplo...": None,
-        "Asian Brown Flycatcher": "asbfly.mp3",
-        "Red-whiskered Bulbul": "rewbul.wav", 
-        "White-throated Kingfisher": "whtkin.mp3"
-    }
-    
-    selected_sample = st.selectbox("Elige un audio de la galería:", list(SAMPLES.keys()))
-    
-    if SAMPLES[selected_sample] is not None:
-        file_name = SAMPLES[selected_sample]
-        # Ajusta la ruta si tus samples están en otra carpeta
-        full_path = os.path.join(config.ASSETS_DIR, "samples", file_name)
+    if analizar:
+        api_url = os.getenv("API_URL", "http://localhost:8000/predict")
         
-        # Fallback por si la estructura de carpetas varía
-        if not os.path.exists(full_path):
-             full_path = os.path.join("assets", "samples", file_name)
-
-        if os.path.exists(full_path):
-            final_audio_path = full_path
-        else:
-            st.error(f"⚠️ Archivo no encontrado: {full_path}")
-
-# ==========================================
-# VISUALIZACIÓN Y ANÁLISIS
-# ==========================================
-if final_audio_path:
-    with st.container(border=True):
-        col_audio, col_spec = st.columns([1, 2], gap="large")
+        # Preparamos payload
+        files = {"file": (nombre_archivo, archivo_bytes, tipo_mime)}
+        params = {"model": modelo_seleccionado}
         
-        with col_audio:
-            st.subheader("1. Escuchar")
-            st.caption(f"Archivo: {os.path.basename(final_audio_path)}")
-            st.audio(final_audio_path)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            # BOTÓN DE ANÁLISIS
-            analyze_btn = st.button(f"ANALIZAR CON {model_option.upper()}", type="primary", use_container_width=True)
-
-        with col_spec:
-            st.subheader("2. Visión del Modelo")
+        with st.spinner(f" {modelo_seleccionado.upper()} está escuchando... (Esto puede tardar un poco)"):
             try:
-                fig_spec = audio_utils.generar_espectrograma_visual(final_audio_path)
-                if fig_spec:
-                    st.pyplot(fig_spec, use_container_width=True)
+                # Timeout alto (300s) para dar tiempo a PaSST si va lento
+                response = requests.post(api_url, files=files, params=params, timeout=300)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    preds = data.get("predictions", [])
+                    img_b64 = data.get("mel_spectrogram", None)
+                    
+                    st.success(" Análisis completado con éxito.")
+                    
+                    # 1. VISUALIZACIÓN ESPECTROGRAMA (XAI)
+                    if img_b64:
+                        with st.expander(" Ver lo que ve la IA (Mel-Spectrogram)", expanded=True):
+                            st.image(img_b64, use_container_width=True)
+                            st.caption("Representación visual de frecuencias (Eje Y) vs Tiempo (Eje X).")
+
+                    # 2. RESULTADOS
+                    st.subheader("Ranking de Especies Detectadas")
+                    
+                    if not preds:
+                        st.warning("No se detectó ninguna especie con suficiente confianza.")
+                    
+                    
+                    #Se limitan los resultados a una confianza del 0.30
+                    preds_shown = [p for p in preds if p['score'] >= 0.30 ]
+                    low_confidence=False
+
+                    if preds_shown:
+                        top_score = preds_shown[0]['score']
+                        #Se elige solo los resultados más cercanos al mejor
+                        preds_shown = [p for p in preds_shown if p['score'] >= (top_score - 0.10)][:3]
+                    else:
+                    #Si nadie ha llegado al 0.30, sacamos la mejor
+                        preds_shown = [preds[0]] if preds else []
+                        low_confidence = True
+                    
+                    for i, p in enumerate(preds_shown):
+                        
+                        score = p['score']
+                        codigo = p['label']
+                        rank = i + 1
+
+                        # Recuperar metadatos del CSV
+                        common_name = codigo
+                        scientific_name = codigo
+                        if not config.SPECIES_DF.empty:
+                            row = config.SPECIES_DF[config.SPECIES_DF['primary_label'] == codigo]
+                            if not row.empty:
+                                common_name = row.iloc[0]['common_name']
+                                scientific_name = row.iloc[0]['scientific_name']
+                                
+
+                        local_photo_path = config.ASSETS_DIR / "images" / codigo / "photo.jpg"
+
+                        if local_photo_path.exists():
+                            image_to_show = str(local_photo_path)
+                        elif config.LOGO_PATH.exists():
+                            image_to_show = str(config.LOGO_PATH)
+                        
+                        links = ui_utils.get_bird_links(scientific_name, ebird_code=codigo)
+                        
+                        
+                        # Tarjeta
+                        with st.container(border=True):
+                            if low_confidence:
+                                st.warning("**Detección incierta:** El modelo tiene dudas, pero esta es la opción más probable.")
+                            c_img, c_txt = st.columns([1, 4])
+                            
+                            with c_img:
+                                st.image(image_to_show, use_container_width=True)
+                            
+                            with c_txt:
+                                st.markdown(f"{common_name}")
+                                st.markdown(f"_{scientific_name}_ | **Confianza:** `{score:.1%}`")
+                                st.progress(score)
+                                
+                                # Botonera de enlaces
+                                c1, c2, c3 = st.columns(3)
+                                c1.link_button("eBird", links['ebird'])
+                                c2.link_button("Wikipedia", links['wikipedia'])
+                                c3.link_button("Xeno-Canto", links['xeno-canto'])
+
                 else:
-                    st.info("No se pudo generar la vista previa.")
+                    st.error(f" Error del Servidor: {response.status_code}")
+                    with st.expander("Ver detalles técnicos"):
+                        st.write(response.text)
+
+            except requests.exceptions.Timeout:
+                st.error("El modelo tardó demasiado en responder. Inténtalo de nuevo (ya estará cargado en RAM).")
+            except requests.exceptions.ConnectionError:
+                st.error("No se pudo conectar a la API. Asegúrate de que Docker está corriendo.")
             except Exception as e:
-                st.warning("Vista previa no disponible.")
+                st.error(f"Error inesperado: {e}")
 
-    # ==========================================
-    # LÓGICA DE PREDICCIÓN
-    # ==========================================
-    if analyze_btn:
-        st.markdown("---")
-        
-        progress_text = "Procesando..."
-        my_bar = st.progress(0, text=progress_text)
-
-        for percent_complete in range(0, 80, 20):
-            time.sleep(0.05)
-            my_bar.progress(percent_complete + 10, text=f"Cargando {model_option}...")
-
-        # --- INFERENCIA ---
-        # Ahora devuelve un array con 101 probabilidades
-        all_probs = inference.predict_bird(final_audio_path, model_key)
-        
-        my_bar.progress(100, text="¡Finalizado!")
-        time.sleep(0.2)
-        my_bar.empty()
-
-        if all_probs is not None:
-            # Convertimos a tensor para usar torch.topk (es más cómodo)
-            probs_tensor = torch.tensor(all_probs)
-            
-            # Obtenemos Top 3
-            top3_prob, top3_idx = torch.topk(probs_tensor, 3)
-            
-            top3_prob = top3_prob.numpy()
-            top3_idx = top3_idx.numpy()
-            
-            # --- DATOS DEL GANADOR ---
-            winner_idx = top3_idx[0]
-            winner_prob = top3_prob[0] * 100
-            winner_label = config.SPECIES_LIST[winner_idx]
-            
-            # Recuperar info del CSV
-            try:
-                row = config.SPECIES_DF[config.SPECIES_DF['primary_label'] == winner_label].iloc[0]
-                common_name = row['common_name']
-                sci_name = row['scientific_name']
-            except:
-                common_name = winner_label
-                sci_name = "Desconocido"
-
-            # --- MOSTRAR RESULTADOS ---
-            r_col1, r_col2 = st.columns([1, 2], gap="large")
-            
-            with r_col1:
-                with st.container(border=True):
-                    img_url = get_wiki_image_url(sci_name)
-                    st.image(img_url, use_container_width=True)
-                    st.caption("Fuente: Wikipedia API")
-
-            with r_col2:
-                # --- PUESTO 1 (ORO) ---
-                html_card = f"""
-                <div class="result-card">
-                    <div style="color: #FF9F33; font-weight: bold; letter-spacing: 1px; margin-bottom: 5px;">🏆 RESULTADO PRINCIPAL</div>
-                    <div class="species-title">{common_name}</div>
-                    <div class="species-sci">{sci_name}</div>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
-                        <span style="font-size: 1.5rem; font-weight: 800; color: #FF4B4B;">{winner_prob:.1f}%</span>
-                        <span style="color: #888; font-size: 0.8rem;">Confianza</span>
-                    </div>
-                    <div class="bar-container">
-                        <div class="bar-fill rank-1" style="width: {winner_prob}%;"></div>
-                    </div>
-                </div>
-                """
-                st.markdown(html_card, unsafe_allow_html=True)
-                
-                st.markdown("#### Otras Posibilidades")
-                
-                # --- PUESTO 2 y 3 (PLATA y BRONCE) ---
-                for i in range(1, 3):
-                    idx = top3_idx[i]
-                    prob = top3_prob[i] * 100
-                    lbl = config.SPECIES_LIST[idx]
-                    
-                    try:
-                        name = config.SPECIES_DF[config.SPECIES_DF['primary_label'] == lbl].iloc[0]['common_name']
-                    except:
-                        name = lbl
-                    
-                    # Generamos la clase CSS correcta (rank-2 o rank-3)
-                    rank_class = f"rank-{i+1}"
-                    
-                    st.markdown(f"""
-                    <div class="secondary-row">
-                        <div style="display:flex; justify-content:space-between; font-weight:500; margin-bottom:4px; color:#EEE;">
-                            <span>{i+1}. {name}</span>
-                            <span>{prob:.1f}%</span>
-                        </div>
-                        <div class="bar-container">
-                            <div class="bar-fill {rank_class}" style="width: {prob}%;"></div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        else:
-            st.error("Error al procesar el modelo. Revisa los logs en la terminal.")
+else:
+    st.info("Selecciona una fuente de audio para comenzar.")

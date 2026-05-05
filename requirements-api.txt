@@ -1,0 +1,19 @@
+# --- MOTOR DE IA ---
+torch==2.3.1
+torchaudio==2.3.1
+torchvision==0.18.1
+
+# --- PROCESAMIENTO Y MODELOS ---
+pandas
+numpy<2.0.0
+librosa==0.10.2
+soundfile
+panns-inference==0.1.1
+hear21passt==0.0.26
+huggingface-hub
+matplotlib
+
+# --- SERVIDOR API ---
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9

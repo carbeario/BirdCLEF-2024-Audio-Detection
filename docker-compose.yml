@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # SERVICIO 1: EL CEREBRO (FastAPI + PyTorch)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api 
+    container_name: birdclef-api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./api:/app/api
+      - ./assets:/app/assets
+    networks:
+      - birdnet
+
+  # SERVICIO 2: LA INTERFAZ (Streamlit)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui 
+    container_name: birdclef-ui
+    command: > 
+      bash -c "python src/download.py &&
+      streamlit run home.py --server.port=8501 --server.address=0.0.0.0"
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000/predict
+    depends_on:
+      - api
+    volumes:
+      - .:/app
+    networks:
+      - birdnet
+
+networks:
+  birdnet:
+    driver: bridge

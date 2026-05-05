@@ -1,9 +1,14 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 
-INPUT_FILE = "train_metadata.csv"
 
+current_file=Path(__file__).resolve()
+
+INPUT_FILE=current_file.parent.parent.parent/"data"/"train_metadata.csv"
+
+print(INPUT_FILE)
 def analizar_corte():
     try:
         df = pd.read_csv(INPUT_FILE)
