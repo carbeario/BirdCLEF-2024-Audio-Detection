@@ -2,10 +2,12 @@ FROM python:3.10-slim
 
 # Herramientas de sistema para audio
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     build-essential  \
     ffmpeg \
     libsndfile1 \
     curl \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

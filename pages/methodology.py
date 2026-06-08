@@ -155,7 +155,7 @@ st.markdown("---")
 st.header("3. Ingeniería de Entrenamiento")
 st.markdown("Optimización del proceso de aprendizaje para maximizar el rendimiento en pocas épocas (Low-Budget Training).")
 
-tab1, tab2, tab3 = st.tabs(["🔥 PaSST (VRAM Hack)", "🛡️ SpecAugment", "📉 OneCycleLR (Scheduler)"])
+tab1, tab2, tab3 = st.tabs(["PaSST (VRAM Solution)", "SpecAugment", "OneCycleLR (Scheduler)"])
 
 # PESTAÑA 1: GRADIENT ACCUMULATION (La que ya tenías bien)
 with tab1:
