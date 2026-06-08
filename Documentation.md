@@ -4,36 +4,38 @@ Este documento detalla la arquitectura de software y la organización de fichero
 
 ## Árbol de Directorios
 
-El proyecto sigue una estructura modular para separar la lógica de inferencia, la interfaz de usuario y los recursos estáticos.
+El proyecto sigue una estructura modular y desacoplada adaptada a un entorno de microservicios orquestado por Docker Compose. Aunque el código reside en un único repositorio para cumplir con los requisitos de evaluación académica, la separación lógica entre componentes es absoluta.
 
 ```text
 TFG_BirdCLEF_2024/
 │
-├── Infraestructura
-│   ├── Dockerfile                 # Definición de la imagen (Python 3.10-slim)
-│   ├── .dockerignore              # Optimización del contexto de build
-│   ├── requirements.txt           # Dependencias Python (Versiones pineadas para estabilidad)
-│   └── packages.txt               # Dependencias de sistema (OS Level)
+├── api/                           # Microservicio Backend (Servidor FastAPI asíncrono)
+│   └── main.py                    # Endpoints de la API RESTful (?model=panns/passt)
 │
-├── Source Code (src/)
-│   ├── config.py                  # Gestión centralizada de configuración y rutas
-│   ├── inference.py               # Motor de inferencia y gestión de descargas de modelos
-│   ├── audio_utils.py             # Pipeline de preprocesamiento (Audio -> Mel Spectrogram)
-│   └── __init__.py
+├── src/                           # Núcleo Computacional y Algorítmico (Inferencia & DSP)
+│   ├── config.py                  # Centralización de parámetros globales y rutas
+│   ├── inference.py               # Motor de inferencia (Patrón Singleton y descarga HF)
+│   └── audio_utils.py             # Pipeline DSP (Audio -> Remuestreo 32kHz -> Espectrograma Log-Mel)
 │
-├── Interfaz (Streamlit)
-│   ├── home.py                    # Punto de entrada de la aplicación
+├── pages/ & home.py               # Capa de Presentación (Frontend ligero en Streamlit)
+│   ├── home.py                    # Punto de entrada y cuadro de mando estadístico (Dashboard)
 │   └── pages/
-│       ├── 1_Detector.py          # Módulo de inferencia en tiempo real
-│       ├── 2_Catalogue.py         # Base de conocimientos de especies
-│       └── 3_Methodology.py       # Documentación integrada en la app
+│       ├── 1_Detector.py          # Módulo de inferencia en tiempo real con Polling Health Check
+│       ├── 2_Catalogue.py         # Base de conocimientos local-first con imágenes persistidas
+│       └── 3_Methodology.py       # Documentación técnica integrada e IA Explicable (XAI)
 │
-├── Assets & Recursos
-│   ├── assets/
-│   │   ├── class_labels_indices.csv # Mapeo de clases (Requisito PANNs)
-│   │   ├── species_metadata.csv     # Metadatos enriquecidos
-│   │   └── logo.png
-│   └── weights/                   # (Generado dinámicamente) Almacén de modelos .pth
+├── assets/                        # Recursos Estáticos y Datos Tabulares
+│   ├── class_labels_indices.csv   # Mapeo de índices latentes (Requisito PANNs)
+│   └── species_metadata.csv       # Registro de metadatos taxonómicos enriquecidos
 │
-└── Legacy & Experiments
-    └── experiments/               # Scripts de entrenamiento y validación previos
+├── experiments/                   # Módulo de Análisis Exploratorio (EDA) y scripts previos
+│   └── decide.py                  # Algoritmo de selección de clases mediante el Método del Codo
+│
+├── weights/                       # Almacén protegido de pesos binarios (.pth) [Ignorado en Git]
+│
+└── Archivos de Infraestructura y Orquestación (Raíz)
+    ├── docker-compose.yml         # Orquestador del ecosistema y definición de la red privada "birdnet"
+    ├── Dockerfile.api             # Definición del contenedor de IA (Backend - Python 3.10-slim + FFmpeg)
+    ├── Dockerfile.ui              # Definición del contenedor de presentación (Frontend - Streamlit ligero)
+    ├── requirements-api.txt       # Dependencias exclusivas del backend (PyTorch, FastAPI, etc.)
+    └── requirements-ui.txt        # Dependencias exclusivas del frontend (Streamlit, Pandas, etc.)

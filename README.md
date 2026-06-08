@@ -2,52 +2,33 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.3.1-EE4C2C?logo=pytorch&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Production_Ready-2496ED?logo=docker&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Microservices-2496ED?logo=docker&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688?logo=fastapi&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.41-FF4B4B?logo=streamlit&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Completed-success)
 
-> **Sistema End-to-End contenerizado para la clasificación de especies aviares mediante arquitecturas híbridas de Deep Learning.**
-
+> **Sistema End-to-End contenerizado mediante arquitectura de microservicios para la clasificación de especies aviares con Deep Learning.**
 
 ## Sobre el Proyecto
-Este proyecto soluciona el desafío de identificar especies de aves en entornos ruidosos mediante el análisis de espectrogramas de audio. A diferencia de scripts académicos aislados, esta solución está diseñada como un **microservicio de producción**.
+Este proyecto soluciona el desafío de identificar especies en entornos ruidosos (Western Ghats, India) mediante el análisis de espectrogramas Mel. A diferencia de scripts académicos aislados, esta solución está diseñada como una arquitectura de **microservicios orientada a producción**, resolviendo problemas críticos de *timeout* en inferencia pesada (32kHz) mediante desacoplamiento.
 
-**Características Principales:**
-- **Arquitectura Híbrida:** Implementación de modelos **CNN14 (PANNs)** y **Transformers (PaSST)** para maximizar la robustez.
-- **Ingeniería de MLOps:** Gestión de pesos desacoplada mediante **Hugging Face Hub** y CI/CD friendly.
-- **Despliegue Agnóstico:** Empaquetado en **Docker** para garantizar la reproducibilidad exacta en cualquier entorno (Linux, Windows, Cloud).
-- **Interfaz Interactiva:** Dashboard analítico desarrollado en Streamlit para usuarios no técnicos.
+## 🏗️ Arquitectura del Sistema (Desacoplado)
+Por requisitos de evaluación del TFG, el código reside en un repositorio único (monorepo), pero el sistema opera estrictamente bajo dos contenedores aislados orquestados por Docker Compose:
 
-## Tech Stack
-* **Core:** Python 3.10
-* **Deep Learning:** PyTorch, Torchaudio, Panns-Inference, Hear21Passt
-* **Procesamiento de Señal:** Librosa, Soundfile
-* **Infraestructura:** Docker (Multi-stage build strategy)
-* **Visualización:** Streamlit, Matplotlib
+* **📦 Contenedor UI (Frontend - `Dockerfile.ui`):** Gestionado por `home.py` y `pages/` (Streamlit). Implementa un patrón de *Polling Health Check* para evitar caídas asíncronas.
+* **🧠 Contenedor API (Backend - `Dockerfile.api`):** Servidor FastAPI asíncrono en la carpeta `api/` y `src/`. Carga modelos PANNs y PaSST directamente en VRAM/RAM y gestiona el pipeline DSP.
 
-## Despliegue Rápido (Docker)
-El sistema está diseñado para ser "Plug & Play". No requiere instalación manual de librerías.
+## Despliegue Rápido (Docker Compose)
+El sistema está diseñado para levantar toda la infraestructura de red, dependencias y modelos preentrenados con un solo comando.
 
 1.  **Clonar repositorio:**
     ```bash
-    git clone https://github.com/carbeario/BirdCLEF-2024-Audio-Detection.git 
+    git clone [https://github.com/carbeario/BirdCLEF-2024-Audio-Detection.git](https://github.com/carbeario/BirdCLEF-2024-Audio-Detection.git) 
     cd BirdCLEF-2024-Audio-Detection
     ```
 
-2.  **Construir Contenedor:**
-    *Nota: Este paso descarga automáticamente los modelos optimizados desde Hugging Face.*
+2.  **Orquestar Microservicios:**
     ```bash
-    docker build -t birdclef-app .
+    docker-compose up --build
     ```
-
-3.  **Ejecutar Servicio:**
-    ```bash
-    docker run -p 8501:8501 birdclef-app
-    ```
-    Accede a la aplicación en: `http://localhost:8501`
-
-## Estructura del Proyecto
-Para detalles técnicos sobre la organización de ficheros y decisiones de arquitectura, consultar [DOCUMENTATION.md](./Documentation.md).
-
----
-*Desarrollado por Carlos Beato Rioja como Trabajo de Fin de Grado (TFG) - 2026*
+    * El Frontend interactivo estará accesible en: `http://localhost:8501`
+    * La documentación interactiva de la API (Swagger UI) en: `http://localhost:8000/docs`
