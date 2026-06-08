@@ -11,11 +11,11 @@
 ## Sobre el Proyecto
 Este proyecto soluciona el desafío de identificar especies en entornos ruidosos (Western Ghats, India) mediante el análisis de espectrogramas Mel. A diferencia de scripts académicos aislados, esta solución está diseñada como una arquitectura de **microservicios orientada a producción**, resolviendo problemas críticos de *timeout* en inferencia pesada (32kHz) mediante desacoplamiento.
 
-## 🏗️ Arquitectura del Sistema (Desacoplado)
+## Arquitectura del Sistema (Desacoplado)
 Por requisitos de evaluación del TFG, el código reside en un repositorio único (monorepo), pero el sistema opera estrictamente bajo dos contenedores aislados orquestados por Docker Compose:
 
-* **📦 Contenedor UI (Frontend - `Dockerfile.ui`):** Gestionado por `home.py` y `pages/` (Streamlit). Implementa un patrón de *Polling Health Check* para evitar caídas asíncronas.
-* **🧠 Contenedor API (Backend - `Dockerfile.api`):** Servidor FastAPI asíncrono en la carpeta `api/` y `src/`. Carga modelos PANNs y PaSST directamente en VRAM/RAM y gestiona el pipeline DSP.
+* **Contenedor UI (Frontend - `Dockerfile.ui`):** Gestionado por `home.py` y `pages/` (Streamlit). Implementa un patrón de *Polling Health Check* para evitar caídas asíncronas.
+* **Contenedor API (Backend - `Dockerfile.api`):** Servidor FastAPI asíncrono en la carpeta `api/` y `src/`. Carga modelos PANNs y PaSST directamente en VRAM/RAM y gestiona el pipeline DSP.
 
 ## Despliegue Rápido (Docker Compose)
 El sistema está diseñado para levantar toda la infraestructura de red, dependencias y modelos preentrenados con un solo comando.
